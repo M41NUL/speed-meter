@@ -1,45 +1,44 @@
-# SPEED METER
+# SPEED METER (static, no backend)
 
-A self-hosted internet speed test — analog dial gauge, dark monochrome instrument-panel look. Flask backend measures real download/upload throughput and ping against your own server (no third-party API dependency).
+Same analog dial speed test — this version has **no server at all**. It measures your connection directly against Cloudflare's public speed-test edge (`speed.cloudflare.com`), the same endpoints that power speed.cloudflare.com itself. Deploys as a single static HTML file, works on Vercel, Netlify, GitHub Pages, or any static host.
 
 ## Files
 
 ```
-speedtest/
-├── server.py           ← Flask backend
-├── requirements.txt
-└── public/
-    └── index.html      ← frontend (dial gauge, all logic, no build step)
+speedtest-vercel/
+├── index.html      ← everything: markup, styles, logic
+└── vercel.json     ← static hosting config (optional but explicit)
 ```
 
-## Run locally
+## Deploy to Vercel
 
 ```bash
-pip install -r requirements.txt
-python server.py
+npm i -g vercel   # if you don't have it already
+cd speedtest-vercel
+vercel
 ```
 
-Open `http://localhost:5000` (or your LAN IP on port 5000 from another device on the same network).
+Or just connect the GitHub repo in the Vercel dashboard — no build command needed, no environment variables, no framework preset (choose "Other").
 
 ## How it works
 
-**Ping** — 5 quick round-trips to `/api/ping`, takes the median to avoid one slow request skewing the result.
+- **Ping** — 5 zero-byte requests to `https://speed.cloudflare.com/__down?bytes=0`, takes the median round-trip time.
+- **Download** — fetches `https://speed.cloudflare.com/__down?bytes=N` at increasing sizes (5MB → 15MB → 30MB), reading the stream and computing live throughput as bytes arrive.
+- **Upload** — POSTs random bytes (2MB → 6MB → 12MB) to `https://speed.cloudflare.com/__up`.
 
-**Download** — fetches `/api/download-test?size=N` in increasing sizes (4MB → 12MB → 24MB) so a slow connection doesn't get stuck waiting on a huge file, and a fast connection gets enough data for an accurate reading. The needle updates live as bytes stream in.
+These are the same (unofficial but stable and widely used) endpoints that Cloudflare's own `@cloudflare/speedtest` npm package and speed.cloudflare.com use internally.
 
-**Upload** — posts random bytes to `/api/upload-test` (2MB → 6MB → 12MB), same ramping approach. The server just reads and discards the data — nothing is saved to disk.
+## Why no backend?
 
-The dial itself is a real instrument-style analog gauge (SVG), with a non-linear scale (0, 5, 10, 25, 50, 100, 250, 500, 1000 Mbps) so typical home-internet speeds (5–200 Mbps) get most of the dial's resolution instead of being crushed into a tiny sliver next to gigabit numbers.
+Vercel's serverless functions aren't a good fit for streaming a large response over time (needed to measure real throughput) — they're built for short, stateless requests. Rather than fight that, this version skips having any backend of our own and points directly at Cloudflare's edge, which is built to handle exactly this kind of test at scale.
 
-Recent test results are kept in the browser's local storage (last 10 runs) — nothing is sent to or stored on the server beyond the transfer itself.
+## Trade-offs vs. the self-hosted version
 
-## Deploy
-
-Same stack you already use for other tools:
-- **Render** — deploy `server.py` as a Python web service (`python server.py` or via gunicorn)
-- Make sure the platform doesn't buffer/compress the streamed download response — that would throw off timing accuracy (Render's default proxy is fine; Cloudflare-proxied domains can sometimes buffer, worth testing after deploy)
+- You're testing against Cloudflare's network specifically, not "the internet" in general — though this is the same approach speedtest.net and Cloudflare's own tool use (test against a known, well-connected server).
+- No control over the test server's location — Cloudflare's anycast network automatically routes you to their nearest edge location, which is usually a good thing.
+- If Cloudflare ever changes or removes these endpoints, the tool would need updating — they're undocumented but have been stable for years and are actively used by Cloudflare's own product.
 
 ## Notes
 
-- This measures your connection to **this specific server**, not a global "internet speed" — for best accuracy, host it somewhere with good general connectivity (same as speedtest.net's model of using nearby test servers).
-- Numbers are estimates. Browser overhead, other apps using the network, and Wi-Fi conditions all affect the result — same caveats as any speed test tool.
+- Requires internet access to `speed.cloudflare.com` — if that domain is blocked on a network (rare, but some corporate/school networks block it), the test will fail to connect.
+- Recent test results are kept in the browser's local storage (last 10 runs) — nothing is sent anywhere except the Cloudflare test traffic itself.

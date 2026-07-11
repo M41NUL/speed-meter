@@ -300,7 +300,7 @@ body{
   </div>
 </div>
 
-<div class="footer">Measurements are estimates — actual speed may vary with network conditions.</div>
+<div class="footer">Measurements run against Cloudflare's edge network. Estimates only — actual speed may vary with network conditions.</div>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -417,6 +417,8 @@ function bytesToMbps(bytes, seconds) {
   return (bytes * 8) / seconds / 1_000_000;
 }
 
+const CF_BASE = 'https://speed.cloudflare.com';
+
 async function runPing() {
   dialPhase.textContent = 'Ping';
   pingCard.classList.add('active');
@@ -424,7 +426,10 @@ async function runPing() {
   for (let i = 0; i < 5; i++) {
     const t0 = performance.now();
     try {
-      await fetch('/api/ping?_=' + Date.now(), { cache: 'no-store', signal: abortController.signal });
+      // smallest possible download (0 bytes) — just measuring round-trip time to Cloudflare's edge
+      await fetch(`${CF_BASE}/__down?bytes=0&_=${Date.now()}`, {
+        cache: 'no-store', signal: abortController.signal, mode: 'cors'
+      });
       samples.push(performance.now() - t0);
     } catch (e) {
       if (e.name === 'AbortError') throw e;
@@ -441,15 +446,16 @@ async function runDownloadTest() {
   dialPhase.textContent = 'Download';
   downCard.classList.add('active');
 
-  const testSizesMB = [4, 12, 24]; // ramps up so slow connections don't wait forever on a huge file
+  const testSizesMB = [5, 15, 30]; // ramps up so slow connections don't wait forever on a huge file
   let bestMbps = 0;
 
   for (const sizeMB of testSizesMB) {
+    const bytes = Math.round(sizeMB * 1024 * 1024);
     const t0 = performance.now();
     let received = 0;
     try {
-      const res = await fetch(`/api/download-test?size=${sizeMB}&_=${Date.now()}`, {
-        cache: 'no-store', signal: abortController.signal
+      const res = await fetch(`${CF_BASE}/__down?bytes=${bytes}&_=${Date.now()}`, {
+        cache: 'no-store', signal: abortController.signal, mode: 'cors'
       });
       const reader = res.body.getReader();
       while (true) {
@@ -488,11 +494,12 @@ async function runUploadTest() {
 
     const t0 = performance.now();
     try {
-      await fetch('/api/upload-test', {
+      await fetch(`${CF_BASE}/__up`, {
         method: 'POST',
         body: payload,
         signal: abortController.signal,
-        cache: 'no-store'
+        cache: 'no-store',
+        mode: 'cors'
       });
     } catch (e) {
       if (e.name === 'AbortError') throw e;
@@ -607,15 +614,15 @@ historyClear.addEventListener('click', () => {
 
 renderHistory();
 
-// ─── Server connectivity check ───
+// ─── Connectivity check (to Cloudflare's edge, since there's no backend of our own) ───
 (async function checkServer() {
   try {
     const t0 = performance.now();
-    const res = await fetch('/api/health', { cache: 'no-store' });
+    const res = await fetch(`${CF_BASE}/__down?bytes=0`, { cache: 'no-store', mode: 'cors' });
     const rtt = Math.round(performance.now() - t0);
     if (res.ok) {
       serverDot.classList.add('live');
-      serverInfoText.textContent = `Connected — ${rtt}ms to server`;
+      serverInfoText.textContent = `Connected — ${rtt}ms to Cloudflare edge`;
     } else {
       throw new Error('not ok');
     }
