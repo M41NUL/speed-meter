@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Speed Meter</title>
+<meta name="theme-color" content="#0a0a0b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0b;
+  --panel-1: #131315;
+  --panel-2: #1a1a1d;
+  --line: #2a2a2e;
+  --line-soft: #1e1e21;
+  --ink: #ececee;
+  --ink-dim: #8a8a90;
+  --ink-faint: #52525a;
+  --needle: #f2f2f4;
+  --needle-shadow: rgba(0,0,0,.6);
+  --good: #ececee;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{overscroll-behavior-y:contain}
+body{
+  background: radial-gradient(120% 90% at 50% -10%, #131316 0%, #0a0a0b 55%);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  min-height: 100dvh;
+  padding-bottom: 48px;
+  overflow-x: hidden;
+}
+
+/* ─── HEADER ─── */
+.header{ padding: 30px 20px 4px; text-align:center; }
+.header .eyebrow{
+  font-family:'JetBrains Mono', monospace; font-size:10.5px; font-weight:600;
+  letter-spacing:2.5px; text-transform:uppercase; color: var(--ink-faint);
+  margin-bottom:8px;
+}
+.header h1{
+  font-size:22px; font-weight:800; letter-spacing:-.3px;
+}
+.header h1 .unit{ color: var(--ink-dim); font-weight:600; }
+
+/* ─── DIAL ─── */
+.dial-section{ padding: 18px 24px 6px; display:flex; justify-content:center; }
+.dial-wrap{ position:relative; width: 300px; height: 300px; max-width: 92vw; max-height: 92vw; }
+.dial-wrap svg{ width:100%; height:100%; overflow: visible; }
+
+.dial-face-bg{ fill: #101012; }
+.dial-rim{ fill:none; stroke: var(--line); stroke-width: 1.5; }
+.dial-rim-inner{ fill:none; stroke: var(--line-soft); stroke-width: 1; }
+
+.tick-major{ stroke: var(--ink-dim); stroke-width: 2; }
+.tick-minor{ stroke: var(--ink-faint); stroke-width: 1; }
+.tick-label{
+  fill: var(--ink-dim); font-family:'JetBrains Mono', monospace;
+  font-size: 10px; font-weight:600; text-anchor:middle;
+}
+.tick-label.zero{ fill: var(--ink-faint); }
+
+.dial-arc-track{ fill:none; stroke: var(--line-soft); stroke-width: 3; stroke-linecap: round; }
+.dial-arc-fill{ fill:none; stroke: var(--ink); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset .25s cubic-bezier(.3,.8,.4,1); opacity:.55; }
+
+.needle-group{ transition: transform .35s cubic-bezier(.34,1.2,.4,1); transform-origin: 150px 150px; }
+.needle-shadow{ fill: var(--needle-shadow); filter: blur(2px); opacity:.5; }
+.needle{ fill: var(--needle); }
+.needle-hub{ fill: #1c1c1f; stroke: var(--line); stroke-width: 1.5; }
+.needle-hub-dot{ fill: var(--ink-faint); }
+
+.glass-highlight{ opacity: .05; }
+
+.dial-readout{
+  position:absolute; left:50%; top:63%; transform:translate(-50%,-50%);
+  text-align:center; pointer-events:none;
+}
+.dial-readout .value{
+  font-family:'JetBrains Mono', monospace; font-size: 34px; font-weight:700;
+  line-height:1; letter-spacing:-.5px; font-variant-numeric: tabular-nums;
+}
+.dial-readout .unit{
+  font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:600;
+  color: var(--ink-dim); letter-spacing:1.5px; margin-top:4px; text-transform:uppercase;
+}
+.dial-readout .phase{
+  font-size:10.5px; font-weight:600; color: var(--ink-faint);
+  text-transform:uppercase; letter-spacing:1.5px; margin-top:9px;
+  font-family:'JetBrains Mono', monospace;
+}
+
+/* ─── ACTION BUTTON ─── */
+.action-section{ padding: 22px 24px 4px; display:flex; justify-content:center; }
+.go-btn{
+  width:132px; height:132px; border-radius:50%;
+  background: radial-gradient(circle at 35% 30%, #1e1e21, #131315 70%);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700;
+  letter-spacing:1.5px; text-transform:uppercase;
+  cursor:pointer;
+  box-shadow: 0 8px 28px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06), inset 0 -12px 20px rgba(0,0,0,.35);
+  transition: transform .12s ease, box-shadow .12s ease;
+  display:none;
+}
+.go-btn.show{ display:block; }
+.go-btn:active{ transform: scale(.96); box-shadow: 0 4px 14px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04), inset 0 -6px 12px rgba(0,0,0,.4); }
+.go-btn .ring{
+  position:absolute; inset:6px; border-radius:50%; border: 1px solid var(--line-soft);
+}
+.go-btn-wrap{ position:relative; width:132px; height:132px; }
+
+.cancel-btn{
+  display:none;
+  margin: 0 auto; padding: 10px 22px; border-radius:100px;
+  background: transparent; border: 1px solid var(--line);
+  color: var(--ink-dim); font-family:'JetBrains Mono', monospace;
+  font-size:11.5px; font-weight:600; letter-spacing:1px; text-transform:uppercase;
+  cursor:pointer;
+}
+.cancel-btn.show{ display:block; }
+.cancel-btn:active{ opacity:.6; }
+
+/* ─── STAT PANEL ─── */
+.stats-section{ padding: 26px 20px 0; max-width: 420px; margin:0 auto; }
+.stats-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat-card{
+  background: var(--panel-1); border: 1px solid var(--line-soft);
+  border-radius: 14px; padding: 14px 8px; text-align:center;
+  position:relative; overflow:hidden;
+}
+.stat-card::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent);
+}
+.stat-card .label{
+  font-family:'JetBrains Mono', monospace; font-size:9px; font-weight:700;
+  letter-spacing:1.2px; text-transform:uppercase; color: var(--ink-faint);
+  margin-bottom:8px;
+}
+.stat-card .value{
+  font-family:'JetBrains Mono', monospace; font-size:19px; font-weight:700;
+  font-variant-numeric: tabular-nums; color: var(--ink-dim);
+  transition: color .3s ease;
+}
+.stat-card .value.done{ color: var(--ink); }
+.stat-card .sub{
+  font-size:9px; color: var(--ink-faint); margin-top:3px;
+  font-family:'JetBrains Mono', monospace;
+}
+.stat-card.active{ border-color: rgba(236,236,238,.28); }
+.stat-card .icon{
+  width:26px; height:26px; margin: 0 auto 8px; opacity:.5;
+}
+.stat-card .icon svg{ width:100%; height:100%; }
+
+/* ─── SERVER INFO ─── */
+.server-info{
+  max-width:420px; margin: 20px auto 0; padding: 0 20px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  font-family:'JetBrains Mono', monospace; font-size:10.5px; color: var(--ink-faint);
+}
+.server-info .dot{
+  width:6px; height:6px; border-radius:50%; background: var(--ink-faint);
+  flex-shrink:0;
+}
+.server-info .dot.live{ background:#e8e8ea; box-shadow:0 0 6px rgba(232,232,234,.6); animation: pulse-live 1.4s ease-in-out infinite; }
+@keyframes pulse-live{ 0%,100%{opacity:1;} 50%{opacity:.4;} }
+
+/* ─── HISTORY ─── */
+.history-section{ max-width:420px; margin: 26px auto 0; padding: 0 20px; }
+.history-label{
+  font-family:'JetBrains Mono', monospace; font-size:10px; font-weight:700;
+  letter-spacing:1.5px; text-transform:uppercase; color: var(--ink-faint);
+  margin-bottom:10px; padding: 0 2px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.history-clear{
+  background:none; border:none; color: var(--ink-faint); font-family:'JetBrains Mono', monospace;
+  font-size:9.5px; cursor:pointer; text-decoration:underline; text-underline-offset:2px;
+}
+.history-list{ display:flex; flex-direction:column; gap:6px; }
+.history-row{
+  display:flex; align-items:center; justify-content:space-between;
+  background: var(--panel-1); border:1px solid var(--line-soft); border-radius:10px;
+  padding: 9px 12px; font-family:'JetBrains Mono', monospace; font-size:11px;
+}
+.history-row .time{ color: var(--ink-faint); }
+.history-row .vals{ display:flex; gap:12px; color: var(--ink-dim); }
+.history-row .vals b{ color: var(--ink); font-weight:600; }
+.history-empty{
+  text-align:center; padding: 22px 10px; color: var(--ink-faint);
+  font-size:11.5px; font-family:'JetBrains Mono', monospace;
+}
+
+/* ─── FOOTER ─── */
+.footer{
+  text-align:center; padding: 34px 20px 10px; font-family:'JetBrains Mono', monospace;
+  font-size:10px; color: var(--ink-faint);
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="eyebrow">Network Instrument</div>
+  <h1>SPEED <span class="unit">METER</span></h1>
+</div>
+
+<div class="dial-section">
+  <div class="dial-wrap">
+    <svg viewBox="0 0 300 300" id="dialSvg">
+      <defs>
+        <radialGradient id="faceGrad" cx="50%" cy="42%" r="65%">
+          <stop offset="0%" stop-color="#161618"/>
+          <stop offset="100%" stop-color="#0d0d0f"/>
+        </radialGradient>
+        <linearGradient id="glassGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.10"/>
+          <stop offset="45%" stop-color="#ffffff" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+
+      <circle class="dial-face-bg" cx="150" cy="150" r="146" fill="url(#faceGrad)"/>
+      <circle class="dial-rim" cx="150" cy="150" r="146"/>
+      <circle class="dial-rim-inner" cx="150" cy="150" r="138"/>
+
+      <!-- progress arc track + fill (drawn by JS via stroke-dasharray) -->
+      <path id="arcTrack" class="dial-arc-track" d=""/>
+      <path id="arcFill" class="dial-arc-fill" d=""/>
+
+      <!-- ticks + labels injected by JS -->
+      <g id="ticksGroup"></g>
+
+      <!-- glass highlight -->
+      <path class="glass-highlight" d="M 40 90 A 140 140 0 0 1 260 90 L 260 60 A 165 165 0 0 0 40 60 Z" fill="url(#glassGrad)"/>
+
+      <!-- needle -->
+      <g class="needle-group" id="needleGroup">
+        <polygon class="needle-shadow" points="150,150 146,152 108,44 150,40 192,44 154,152" transform="translate(1.5,2.5)"/>
+        <polygon class="needle" points="150,150 146,152 108,44 150,40 192,44 154,152"/>
+        <circle class="needle-hub" cx="150" cy="150" r="13"/>
+        <circle class="needle-hub-dot" cx="150" cy="150" r="3.5"/>
+      </g>
+    </svg>
+
+    <div class="dial-readout">
+      <div class="value" id="dialValue">0.0</div>
+      <div class="unit">Mbps</div>
+      <div class="phase" id="dialPhase">Ready</div>
+    </div>
+  </div>
+</div>
+
+<div class="action-section">
+  <div class="go-btn-wrap">
+    <button class="go-btn show" id="goBtn"><span class="ring"></span>START</button>
+  </div>
+</div>
+<div style="display:flex; justify-content:center; margin-top:14px;">
+  <button class="cancel-btn" id="cancelBtn">Cancel test</button>
+</div>
+
+<div class="stats-section">
+  <div class="stats-grid">
+    <div class="stat-card" id="pingCard">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20a8 8 0 100-16 8 8 0 000 16z"/><path d="M12 12l4-4M12 4v2M12 18v2M4 12h2M18 12h2"/></svg></div>
+      <div class="label">Ping</div>
+      <div class="value" id="pingValue">—</div>
+      <div class="sub">ms</div>
+    </div>
+    <div class="stat-card" id="downCard">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 4v12m0 0l-5-5m5 5l5-5M5 20h14"/></svg></div>
+      <div class="label">Download</div>
+      <div class="value" id="downValue">—</div>
+      <div class="sub">Mbps</div>
+    </div>
+    <div class="stat-card" id="upCard">
+      <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20V8m0 0l-5 5m5-5l5 5M5 4h14"/></svg></div>
+      <div class="label">Upload</div>
+      <div class="value" id="upValue">—</div>
+      <div class="sub">Mbps</div>
+    </div>
+  </div>
+</div>
+
+<div class="server-info">
+  <span class="dot" id="serverDot"></span>
+  <span id="serverInfoText">Checking connection…</span>
+</div>
+
+<div class="history-section">
+  <div class="history-label">
+    <span>Recent Tests</span>
+    <button class="history-clear" id="historyClear">Clear</button>
+  </div>
+  <div class="history-list" id="historyList">
+    <div class="history-empty">No tests run yet</div>
+  </div>
+</div>
+
+<div class="footer">Measurements are estimates — actual speed may vary with network conditions.</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const goBtn = $('goBtn');
+const cancelBtn = $('cancelBtn');
+const dialValue = $('dialValue');
+const dialPhase = $('dialPhase');
+const pingValue = $('pingValue');
+const downValue = $('downValue');
+const upValue = $('upValue');
+const pingCard = $('pingCard');
+const downCard = $('downCard');
+const upCard = $('upCard');
+const serverDot = $('serverDot');
+const serverInfoText = $('serverInfoText');
+const historyList = $('historyList');
+const historyClear = $('historyClear');
+const needleGroup = $('needleGroup');
+const ticksGroup = $('ticksGroup');
+const arcTrack = $('arcTrack');
+const arcFill = $('arcFill');
+
+// ─── Dial geometry ───
+// 270-degree sweep, starting at -135deg (bottom-left) ending at +135deg (bottom-right)
+const CX = 150, CY = 150, R = 146;
+const START_ANGLE = -135;
+const END_ANGLE = 135;
+const SWEEP = END_ANGLE - START_ANGLE; // 270
+
+// Non-linear scale so low speeds (where most connections sit) get more of the dial.
+// Ticks are placed at these Mbps values, evenly spaced around the dial.
+const TICKS = [0, 5, 10, 25, 50, 100, 250, 500, 1000];
+
+function valueToAngle(mbps) {
+  // find position along the TICKS scale (piecewise linear between tick points)
+  const v = Math.max(0, Math.min(mbps, TICKS[TICKS.length - 1]));
+  let idx = 0;
+  for (let i = 0; i < TICKS.length - 1; i++) {
+    if (v >= TICKS[i] && v <= TICKS[i + 1]) { idx = i; break; }
+    idx = i;
+  }
+  const segFrac = (v - TICKS[idx]) / (TICKS[idx + 1] - TICKS[idx] || 1);
+  const perSeg = SWEEP / (TICKS.length - 1);
+  const angle = START_ANGLE + idx * perSeg + segFrac * perSeg;
+  return angle;
+}
+
+function polarPoint(cx, cy, r, angleDeg) {
+  const rad = (angleDeg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function describeArc(cx, cy, r, startAngle, endAngle) {
+  const start = polarPoint(cx, cy, r, endAngle);
+  const end = polarPoint(cx, cy, r, startAngle);
+  const largeArc = (endAngle - startAngle) <= 180 ? 0 : 1;
+  return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y}`;
+}
+
+function buildDial() {
+  // full track arc
+  arcTrack.setAttribute('d', describeArc(CX, CY, 128, START_ANGLE, END_ANGLE));
+  arcFill.setAttribute('d', describeArc(CX, CY, 128, START_ANGLE, END_ANGLE));
+
+  const trackLen = arcTrack.getTotalLength();
+  arcFill.style.strokeDasharray = trackLen;
+  arcFill.style.strokeDashoffset = trackLen;
+
+  // ticks
+  let html = '';
+  const perSeg = SWEEP / (TICKS.length - 1);
+  TICKS.forEach((val, i) => {
+    const angle = START_ANGLE + i * perSeg;
+    const outer = polarPoint(CX, CY, 136, angle);
+    const inner = polarPoint(CX, CY, 118, angle);
+    const labelPos = polarPoint(CX, CY, 100, angle);
+    html += `<line class="tick-major" x1="${outer.x}" y1="${outer.y}" x2="${inner.x}" y2="${inner.y}"/>`;
+    html += `<text class="tick-label${val === 0 ? ' zero' : ''}" x="${labelPos.x}" y="${labelPos.y + 3}">${val}</text>`;
+
+    // minor ticks between major ones (skip after the last)
+    if (i < TICKS.length - 1) {
+      for (let m = 1; m <= 3; m++) {
+        const minorAngle = angle + (perSeg * m / 4);
+        const mOuter = polarPoint(CX, CY, 136, minorAngle);
+        const mInner = polarPoint(CX, CY, 126, minorAngle);
+        html += `<line class="tick-minor" x1="${mOuter.x}" y1="${mOuter.y}" x2="${mInner.x}" y2="${mInner.y}"/>`;
+      }
+    }
+  });
+  ticksGroup.innerHTML = html;
+
+  setNeedle(0);
+}
+
+function setNeedle(mbps) {
+  const angle = valueToAngle(mbps);
+  needleGroup.style.transform = `rotate(${angle}deg)`;
+  dialValue.textContent = mbps < 10 ? mbps.toFixed(1) : Math.round(mbps).toString();
+
+  const trackLen = arcTrack.getTotalLength();
+  const frac = (angle - START_ANGLE) / SWEEP;
+  arcFill.style.strokeDashoffset = trackLen * (1 - frac);
+}
+
+buildDial();
+
+// ─── Speed test logic ───
+let testRunning = false;
+let abortController = null;
+
+function bytesToMbps(bytes, seconds) {
+  if (seconds <= 0) return 0;
+  return (bytes * 8) / seconds / 1_000_000;
+}
+
+async function runPing() {
+  dialPhase.textContent = 'Ping';
+  pingCard.classList.add('active');
+  const samples = [];
+  for (let i = 0; i < 5; i++) {
+    const t0 = performance.now();
+    try {
+      await fetch('/api/ping?_=' + Date.now(), { cache: 'no-store', signal: abortController.signal });
+      samples.push(performance.now() - t0);
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+    }
+  }
+  pingCard.classList.remove('active');
+  if (!samples.length) return null;
+  samples.sort((a, b) => a - b);
+  const median = samples[Math.floor(samples.length / 2)];
+  return Math.round(median);
+}
+
+async function runDownloadTest() {
+  dialPhase.textContent = 'Download';
+  downCard.classList.add('active');
+
+  const testSizesMB = [4, 12, 24]; // ramps up so slow connections don't wait forever on a huge file
+  let bestMbps = 0;
+
+  for (const sizeMB of testSizesMB) {
+    const t0 = performance.now();
+    let received = 0;
+    try {
+      const res = await fetch(`/api/download-test?size=${sizeMB}&_=${Date.now()}`, {
+        cache: 'no-store', signal: abortController.signal
+      });
+      const reader = res.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        received += value.length;
+        const elapsed = (performance.now() - t0) / 1000;
+        if (elapsed > 0.15) {
+          const liveMbps = bytesToMbps(received, elapsed);
+          setNeedle(liveMbps);
+        }
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      break;
+    }
+    const totalElapsed = (performance.now() - t0) / 1000;
+    const mbps = bytesToMbps(received, totalElapsed);
+    bestMbps = Math.max(bestMbps, mbps);
+  }
+
+  downCard.classList.remove('active');
+  return bestMbps;
+}
+
+async function runUploadTest() {
+  dialPhase.textContent = 'Upload';
+  upCard.classList.add('active');
+
+  const testSizesMB = [2, 6, 12];
+  let bestMbps = 0;
+
+  for (const sizeMB of testSizesMB) {
+    const payload = new Uint8Array(sizeMB * 1024 * 1024);
+    crypto.getRandomValues(payload.subarray(0, Math.min(payload.length, 65536))); // seed randomness cheaply
+
+    const t0 = performance.now();
+    try {
+      await fetch('/api/upload-test', {
+        method: 'POST',
+        body: payload,
+        signal: abortController.signal,
+        cache: 'no-store'
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      break;
+    }
+    const elapsed = (performance.now() - t0) / 1000;
+    const mbps = bytesToMbps(payload.length, elapsed);
+    bestMbps = Math.max(bestMbps, mbps);
+    setNeedle(mbps);
+  }
+
+  upCard.classList.remove('active');
+  return bestMbps;
+}
+
+function resetStats() {
+  pingValue.textContent = '—';
+  downValue.textContent = '—';
+  upValue.textContent = '—';
+  [pingValue, downValue, upValue].forEach(el => el.classList.remove('done'));
+  setNeedle(0);
+}
+
+async function startTest() {
+  if (testRunning) return;
+  testRunning = true;
+  abortController = new AbortController();
+
+  goBtn.classList.remove('show');
+  cancelBtn.classList.add('show');
+  resetStats();
+  dialPhase.textContent = 'Starting…';
+
+  try {
+    const ping = await runPing();
+    if (ping !== null) {
+      pingValue.textContent = ping;
+      pingValue.classList.add('done');
+    }
+
+    const down = await runDownloadTest();
+    downValue.textContent = down.toFixed(down < 10 ? 1 : 0);
+    downValue.classList.add('done');
+
+    const up = await runUploadTest();
+    upValue.textContent = up.toFixed(up < 10 ? 1 : 0);
+    upValue.classList.add('done');
+
+    dialPhase.textContent = 'Done';
+    setNeedle(down);
+    saveHistory({ ping, down, up });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      dialPhase.textContent = 'Cancelled';
+    } else {
+      dialPhase.textContent = 'Error';
+    }
+  } finally {
+    testRunning = false;
+    abortController = null;
+    goBtn.classList.add('show');
+    cancelBtn.classList.remove('show');
+  }
+}
+
+function cancelTest() {
+  if (abortController) abortController.abort();
+}
+
+goBtn.addEventListener('click', startTest);
+cancelBtn.addEventListener('click', cancelTest);
+
+// ─── History (local, in-memory only per session — no localStorage per artifact rules,
+// but this is a plain server-hosted page, not a claude.ai artifact, so localStorage is fine here) ───
+const HISTORY_KEY = 'speedmeter_history';
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  } catch (e) { return []; }
+}
+
+function saveHistory(entry) {
+  const history = loadHistory();
+  history.unshift({ ...entry, time: new Date().toLocaleString() });
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 10)));
+  renderHistory();
+}
+
+function renderHistory() {
+  const history = loadHistory();
+  if (!history.length) {
+    historyList.innerHTML = '<div class="history-empty">No tests run yet</div>';
+    return;
+  }
+  historyList.innerHTML = history.map(h => `
+    <div class="history-row">
+      <span class="time">${h.time}</span>
+      <span class="vals">
+        <span>↓ <b>${h.down.toFixed(1)}</b></span>
+        <span>↑ <b>${h.up.toFixed(1)}</b></span>
+        <span>${h.ping ?? '—'}ms</span>
+      </span>
+    </div>
+  `).join('');
+}
+
+historyClear.addEventListener('click', () => {
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+});
+
+renderHistory();
+
+// ─── Server connectivity check ───
+(async function checkServer() {
+  try {
+    const t0 = performance.now();
+    const res = await fetch('/api/health', { cache: 'no-store' });
+    const rtt = Math.round(performance.now() - t0);
+    if (res.ok) {
+      serverDot.classList.add('live');
+      serverInfoText.textContent = `Connected — ${rtt}ms to server`;
+    } else {
+      throw new Error('not ok');
+    }
+  } catch (e) {
+    serverInfoText.textContent = 'Could not reach test server';
+  }
+})();
+</script>
+
+</body>
+</html>
